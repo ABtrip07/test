@@ -1,0 +1,16 @@
+; Engine configuration file.
+
+[application]
+
+config/name="The Last Collective - Prototype"
+config/features=PackedStringArray("4.4")
+run/main_scene="res://tests/test_main.tscn"
+
+[autoload]
+
+Resources="*res://autoloads/resource_subsystem.gd"
+Villagers="*res://autoloads/villager_subsystem.gd"
+Decrees="*res://autoloads/decree_system.gd"
+Lots="*res://autoloads/lot_system.gd"
+Army="*res://autoloads/army_manager.gd"
+Clans="*res://autoloads/clan_manager.gd"
