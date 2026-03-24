@@ -1,0 +1,67 @@
+# Unreal Engine generated
+Binaries/
+DerivedDataCache/
+Intermediate/
+Saved/
+Build/
+
+# But keep Build config whitelists
+!Build/*/
+Build/*/*
+!Build/*/PakBlacklist*.txt
+!Build/**/*.ico
+
+# Built data for maps
+*_BuiltData.uasset
+
+# Visual Studio / Rider
+.vs/
+.vscode/
+.idea/
+*.sln
+*.suo
+*.opensdf
+*.sdf
+*.VC.db
+*.VC.opendb
+.vsconfig
+
+# Compiled object files
+*.slo
+*.lo
+*.o
+*.obj
+
+# Precompiled headers
+*.gch
+*.pch
+
+# Compiled libraries
+*.so
+*.dylib
+*.dll
+*.lai
+*.la
+*.a
+*.lib
+
+# Executables
+*.exe
+*.out
+*.app
+*.ipa
+
+# Precompiled assets
+SourceArt/**/*.png
+SourceArt/**/*.tga
+
+# Plugin binaries/intermediates
+Plugins/**/Binaries/*
+Plugins/**/Intermediate/*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Crashpad
+crashpad/

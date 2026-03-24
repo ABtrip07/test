@@ -1,0 +1,27 @@
+{
+    "FileVersion": 3,
+    "EngineAssociation": "5.5",
+    "Category": "Game",
+    "Description": "The Last Collective - Post-apocalyptic civilization builder with idle mechanics",
+    "Modules": [
+        {
+            "Name": "TheLastCollective",
+            "Type": "Runtime",
+            "LoadingPhase": "Default",
+            "AdditionalDependencies": [
+                "Engine",
+                "AIModule"
+            ]
+        }
+    ],
+    "Plugins": [
+        {
+            "Name": "EnhancedInput",
+            "Enabled": true
+        },
+        {
+            "Name": "GameplayAbilities",
+            "Enabled": true
+        }
+    ]
+}
