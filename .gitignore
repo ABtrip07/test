@@ -65,3 +65,7 @@ Thumbs.db
 
 # Crashpad
 crashpad/
+
+# Dev screenshots (Xvfb visual verification during iteration)
+shot_*.png
+/tmp/godot_boot.log
