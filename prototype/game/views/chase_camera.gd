@@ -6,9 +6,9 @@ extends Camera3D
 ## on the LEFT of the frame — classic Gears/RE4 OTS framing.
 
 @export var target: Node3D
-@export var distance: float = 3.8      # Close behind
-@export var height: float = 2.4        # Around shoulder height
-@export var shoulder_offset: float = 1.4 # Lateral offset to the right of target midline
+@export var distance: float = 5.2      # Close behind
+@export var height: float = 3.4        # Around shoulder height
+@export var shoulder_offset: float = 1.6 # Lateral offset to the right of target midline
 @export var follow_smoothness: float = 12.0
 @export var look_ahead: float = 12.0   # How far ahead the camera looks
 

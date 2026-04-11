@@ -367,16 +367,32 @@ func _toggle_godking_mode() -> void:
 
 func _enter_godking_mode() -> void:
 	_god_king_mode = true
-	# If there's an active battle, drop the god-king into it. Otherwise spawn at home_base.
+	# If there's an active battle, drop the god-king into it. Otherwise kick off a
+	# fresh assault on the closest enemy lot, spawning his escort + defenders so
+	# there are real troops on both sides when he lands.
 	var drop_pos: Vector3
 	var battle_lot: StringName = _settlement.get_any_active_battle_lot()
 	if battle_lot != &"":
 		drop_pos = _settlement.get_active_battle_center(battle_lot) + Vector3(5.0, 0.0, 5.0)
 		_push_event("The God-King crashes into the battle at %s!" % String(battle_lot), Color(1.0, 0.85, 0.3))
 	else:
-		var home_view: Node3D = _settlement.get_lot_view(&"home_base")
-		drop_pos = (home_view.global_position if home_view else Vector3.ZERO) + Vector3(6, 0, 6)
-		_push_event("The God-King strides onto the field.", Color(1.0, 0.85, 0.3))
+		var target_lot_id: StringName = _pick_assault_target()
+		if target_lot_id != &"":
+			var tv: Node3D = _settlement.get_lot_view(target_lot_id)
+			drop_pos = tv.global_position + Vector3(5.0, 0.0, 5.0)
+			var target_lot: LotTypes.LotData = Lots.get_lot_data(target_lot_id)
+			var defender_clan: StringName = target_lot.owning_clan_id if target_lot else NEUTRAL_CLAN
+			if not _settlement.has_active_battle(target_lot_id):
+				_settlement.start_live_battle(target_lot_id, PLAYER_CLAN, defender_clan, 5, 4)
+			_settlement.spawn_battle_puff(tv.global_position + Vector3(0, 1.2, 0), "CHARGE!", Color(1.0, 0.85, 0.3))
+			_push_event(
+				"The God-King leads the charge on %s!" % String(target_lot_id),
+				Color(1.0, 0.85, 0.3)
+			)
+		else:
+			var home_view: Node3D = _settlement.get_lot_view(&"home_base")
+			drop_pos = (home_view.global_position if home_view else Vector3.ZERO) + Vector3(6, 0, 6)
+			_push_event("The God-King strides onto the field — no foes in sight.", Color(0.9, 0.95, 1.0))
 	if _god_king == null:
 		_god_king = Node3D.new()
 		_god_king.set_script(GodKingViewScript)
@@ -392,12 +408,57 @@ func _enter_godking_mode() -> void:
 		$World.add_child(_chase_camera)
 	_chase_camera.attach(_god_king)
 	_chase_camera.current = true
+	# Wire the God-King into the combat layer so he can kill and be killed.
+	if _settlement and _settlement.has_method("set_god_king"):
+		_settlement.set_god_king(_god_king)
+	if _god_king.has_signal("hit_attempted") and not _god_king.hit_attempted.is_connected(_on_godking_hit):
+		_god_king.hit_attempted.connect(_on_godking_hit)
+	if _god_king.has_signal("died") and not _god_king.died.is_connected(_on_godking_died):
+		_god_king.died.connect(_on_godking_died)
 
 func _exit_godking_mode() -> void:
 	_god_king_mode = false
 	if _orbit_camera:
 		_orbit_camera.current = true
-	_push_event("You ascend back to the god-view.", Color(0.9, 0.95, 1.0))
+	if _settlement and _settlement.has_method("clear_god_king"):
+		_settlement.clear_god_king()
+	if _god_king:
+		if _god_king.hit_attempted.is_connected(_on_godking_hit):
+			_god_king.hit_attempted.disconnect(_on_godking_hit)
+		if _god_king.died.is_connected(_on_godking_died):
+			_god_king.died.disconnect(_on_godking_died)
+		_god_king.queue_free()
+		_god_king = null
+
+func _on_godking_hit(origin: Vector3, forward: Vector3, hit_range: float, arc_deg: float, dmg: float) -> void:
+	if _settlement and _settlement.has_method("resolve_god_king_hit"):
+		_settlement.resolve_god_king_hit(origin, forward, hit_range, arc_deg, dmg)
+
+func _on_godking_died() -> void:
+	_push_event("THE GOD-KING HAS FALLEN!", Color(1.0, 0.3, 0.3))
+	if _hud and _hud.has_method("show_raid_banner"):
+		_hud.show_raid_banner(
+			"THE GOD-KING FALLS",
+			"The crown rolls in the dust...",
+			Color(1.0, 0.3, 0.25)
+		)
+	_exit_godking_mode()
+
+func _pick_assault_target() -> StringName:
+	# Closest enemy (rival) lot to home_base. Falls back to any rival, then empty.
+	var home_view: Node3D = _settlement.get_lot_view(&"home_base")
+	var home_pos: Vector3 = home_view.global_position if home_view else Vector3.ZERO
+	var best: StringName = &""
+	var best_dist: float = 1e9
+	for lot: LotTypes.LotData in Lots.get_lots_by_clan(RIVAL_CLAN):
+		var lv: Node3D = _settlement.get_lot_view(lot.lot_id)
+		if lv == null:
+			continue
+		var d: float = home_pos.distance_to(lv.global_position)
+		if d < best_dist:
+			best_dist = d
+			best = lot.lot_id
+	return best
 
 func _issue_player_decree(type: int, target_id: StringName) -> void:
 	var d: DecreeTypes.Decree = DecreeTypes.Decree.new(type, target_id, 5)

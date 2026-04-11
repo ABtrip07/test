@@ -10,30 +10,49 @@ enum Stance { UP, DOWN_LEFT, DOWN_RIGHT }
 
 signal stance_changed(new_stance: int)
 signal swing_thrown(from_stance: int)
+signal hit_attempted(origin: Vector3, forward: Vector3, hit_range: float, arc_deg: float, dmg: float)
+signal died()
 
 const RUN_SPEED: float = 7.5
 const TURN_SPEED: float = 8.0
 const SWING_WINDUP: float = 0.25
 const PARRY_WINDOW: float = 0.35
+# Combat tuning — a bit stronger than a CoC hero. Tanky wrecking ball that
+# can be overwhelmed by swarms but cleaves through mobs when uncontested.
+const MAX_HP: float = 110.0
+const SWING_DMG: float = 14.0
+const SWING_RANGE: float = 3.0
+const SWING_ARC_DEG: float = 110.0
 
 var current_stance: int = Stance.UP
+var clan_id: StringName = &"chosen"
+var hp: float = MAX_HP
+var max_hp: float = MAX_HP
 var _body: MeshInstance3D
 var _sword: MeshInstance3D
 var _sword_pivot: Node3D
 var _stance_indicator: Label3D
+var _hp_bar: MeshInstance3D
+var _hp_mat: StandardMaterial3D
 var _facing_deg: float = 0.0
 var _is_swinging: bool = false
 var _swing_tween: Tween
 var _parry_timer: float = 0.0
+var _dead: bool = false
+var _hit_flash_timer: float = 0.0
+var _body_base_col: Color
 
 func setup(spawn_pos: Vector3) -> void:
 	global_position = spawn_pos
+	hp = MAX_HP
+	_dead = false
 	_build_meshes()
 	_set_stance(Stance.UP)
 
 func _build_meshes() -> void:
 	# Chibi proportions: stubby body, huge spherical head, tiny legs.
 	var body_col: Color = FactionPalette.primary_color(FactionPalette.CHOSEN)
+	_body_base_col = body_col
 	var skin_col: Color = Color(0.96, 0.82, 0.68)
 	var leg_col: Color = Color(0.42, 0.3, 0.18)
 	# Stubby barrel torso
@@ -135,6 +154,17 @@ func _build_meshes() -> void:
 	_stance_indicator.outline_modulate = Color(0.1, 0.05, 0.0)
 	_stance_indicator.position = Vector3(0, 4.5, 0)
 	add_child(_stance_indicator)
+	# Oversized HP bar above the crown — readable at chase-cam distance
+	_hp_bar = MeshInstance3D.new()
+	var bar: BoxMesh = BoxMesh.new()
+	bar.size = Vector3(2.4, 0.24, 0.22)
+	_hp_bar.mesh = bar
+	_hp_mat = StandardMaterial3D.new()
+	_hp_mat.albedo_color = Color(0.4, 1.0, 0.5)
+	_hp_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_hp_bar.material_override = _hp_mat
+	_hp_bar.position = Vector3(0, 5.05, 0)
+	add_child(_hp_bar)
 
 func _mat(col: Color, metallic: float, roughness: float) -> StandardMaterial3D:
 	var m: StandardMaterial3D = StandardMaterial3D.new()
@@ -186,7 +216,7 @@ func set_stance_by_input(up: bool, left: bool, right: bool) -> void:
 		_set_stance(Stance.DOWN_RIGHT)
 
 func process_movement(delta: float, move_vec: Vector3) -> void:
-	if _is_swinging:
+	if _is_swinging or _dead:
 		return
 	if move_vec.length() > 0.05:
 		var desired: Vector3 = move_vec.normalized() * RUN_SPEED * delta
@@ -195,7 +225,7 @@ func process_movement(delta: float, move_vec: Vector3) -> void:
 		rotation.y = _facing_deg
 
 func swing() -> bool:
-	if _is_swinging:
+	if _is_swinging or _dead:
 		return false
 	_is_swinging = true
 	var from: int = current_stance
@@ -205,10 +235,34 @@ func swing() -> bool:
 	_swing_tween = create_tween()
 	_swing_tween.tween_property(_sword_pivot, "rotation", mid_rot, SWING_WINDUP) \
 		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	# At the apex of the swing — blade extended — resolve hits.
+	_swing_tween.tween_callback(func(): _emit_hit_attempt())
 	_swing_tween.tween_property(_sword_pivot, "rotation", start_rot, 0.25) \
 		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
 	_swing_tween.tween_callback(func(): _is_swinging = false)
 	return true
+
+func _emit_hit_attempt() -> void:
+	if _dead:
+		return
+	var forward: Vector3 = Vector3(sin(_facing_deg), 0.0, cos(_facing_deg))
+	# Origin at torso height — the sword sweeps roughly here.
+	var origin: Vector3 = global_position + Vector3(0, 1.2, 0)
+	hit_attempted.emit(origin, forward, SWING_RANGE, SWING_ARC_DEG, SWING_DMG)
+
+func take_damage(amount: float) -> void:
+	if _dead:
+		return
+	hp = maxf(0.0, hp - amount)
+	var r: float = clampf(hp / max_hp, 0.0, 1.0)
+	_hp_bar.scale = Vector3(maxf(0.05, r), 1.0, 1.0)
+	_hp_mat.albedo_color = Color(1.0 - r, r, 0.3)
+	_hit_flash_timer = 0.12
+	if _body and _body.material_override:
+		(_body.material_override as StandardMaterial3D).albedo_color = Color(1.0, 0.6, 0.5)
+	if hp <= 0.0:
+		_dead = true
+		died.emit()
 
 func start_parry() -> void:
 	_parry_timer = PARRY_WINDOW
@@ -227,3 +281,7 @@ func receive_incoming_swing(from_stance: int) -> String:
 func visual_tick(delta: float) -> void:
 	if _parry_timer > 0.0:
 		_parry_timer = maxf(0.0, _parry_timer - delta)
+	if _hit_flash_timer > 0.0:
+		_hit_flash_timer = maxf(0.0, _hit_flash_timer - delta)
+		if _hit_flash_timer == 0.0 and _body and _body.material_override:
+			(_body.material_override as StandardMaterial3D).albedo_color = _body_base_col

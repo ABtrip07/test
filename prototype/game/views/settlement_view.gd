@@ -18,6 +18,7 @@ var _villager_views: Dictionary = {}  # StringName villager_id -> Node3D (villag
 var _building_views: Dictionary = {}  # StringName building_id -> Node3D (building_view)
 var _trebuchets: Dictionary = {}  # StringName lot_id -> Node3D (trebuchet_view)
 var _active_battles: Dictionary = {}  # StringName lot_id -> { attackers: [], defenders: [], attacker_clan, defender_clan, timer }
+var _god_king_ref: Node3D = null  # Non-null while the God-King is on the field
 
 @onready var _lots_container: Node3D = Node3D.new()
 @onready var _cannons_container: Node3D = Node3D.new()
@@ -140,19 +141,67 @@ func get_any_active_battle_lot() -> StringName:
 
 func _tick_battles(delta: float) -> void:
 	var to_resolve: Array = []
+	# _god_king_ref is cleared by the game controller when he dies, so a valid
+	# reference here is always a live fighting god-king.
+	var gk_alive: bool = _god_king_ref != null and is_instance_valid(_god_king_ref)
+	var gk_clan: StringName = _god_king_ref.clan_id if gk_alive else &""
 	for lot_id: StringName in _active_battles.keys():
 		var b: Dictionary = _active_battles[lot_id]
 		b.attackers = (b.attackers as Array).filter(func(u): return is_instance_valid(u))
 		b.defenders = (b.defenders as Array).filter(func(u): return is_instance_valid(u))
+		# Extend enemy lists with the God-King if he is hostile to that side.
+		var attacker_enemies: Array = b.defenders.duplicate()
+		var defender_enemies: Array = b.attackers.duplicate()
+		if gk_alive:
+			if b.attacker_clan != gk_clan:
+				attacker_enemies.append(_god_king_ref)
+			if b.defender_clan != gk_clan:
+				defender_enemies.append(_god_king_ref)
 		for a: Node3D in b.attackers:
-			a.tick_combat(delta, b.defenders)
+			a.tick_combat(delta, attacker_enemies)
 		for d: Node3D in b.defenders:
-			d.tick_combat(delta, b.attackers)
+			d.tick_combat(delta, defender_enemies)
 		b.timer -= delta
 		if b.attackers.is_empty() or b.defenders.is_empty() or b.timer <= 0.0:
 			to_resolve.append(lot_id)
 	for lot_id: StringName in to_resolve:
 		_resolve_battle(lot_id)
+
+func set_god_king(gk: Node3D) -> void:
+	_god_king_ref = gk
+
+func clear_god_king() -> void:
+	_god_king_ref = null
+
+## Apply a God-King melee swing. Hits any non-friendly battle unit within the
+## given arc + range across all active battles.
+func resolve_god_king_hit(origin: Vector3, forward: Vector3, hit_range: float, arc_deg: float, dmg: float) -> void:
+	if _god_king_ref == null or not is_instance_valid(_god_king_ref):
+		return
+	var gk_clan: StringName = _god_king_ref.clan_id
+	var cos_thresh: float = cos(deg_to_rad(arc_deg * 0.5))
+	var hit_any: bool = false
+	for lot_id: StringName in _active_battles.keys():
+		var b: Dictionary = _active_battles[lot_id]
+		var all_units: Array = (b.attackers as Array) + (b.defenders as Array)
+		for u: Node3D in all_units:
+			if u == null or not is_instance_valid(u) or u == _god_king_ref:
+				continue
+			if u.clan_id == gk_clan:
+				continue  # no friendly fire yet (MP phase work)
+			var dp: Vector3 = u.global_position - origin
+			dp.y = 0.0
+			var dist: float = dp.length()
+			if dist > hit_range or dist < 0.01:
+				continue
+			var dir: Vector3 = dp / dist
+			if dir.dot(forward) < cos_thresh:
+				continue
+			u.take_damage(dmg)
+			hit_any = true
+			spawn_battle_puff(u.global_position + Vector3(0, 1.4, 0), "SLASH!", Color(1.0, 0.95, 0.45))
+	if not hit_any:
+		spawn_battle_puff(origin + forward * (hit_range * 0.55) + Vector3(0, 0.4, 0), "MISS", Color(0.7, 0.7, 0.8))
 
 func _resolve_battle(lot_id: StringName) -> void:
 	var b: Dictionary = _active_battles[lot_id]
