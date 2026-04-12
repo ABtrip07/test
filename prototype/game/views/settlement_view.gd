@@ -147,15 +147,19 @@ func _tick_battles(delta: float) -> void:
 	var gk_clan: StringName = _god_king_ref.clan_id if gk_alive else &""
 	for lot_id: StringName in _active_battles.keys():
 		var b: Dictionary = _active_battles[lot_id]
-		# Detect deaths before filtering — spawn death poofs and damage numbers.
-		for u: Node3D in b.attackers:
-			if is_instance_valid(u) and u.hp <= 0.0:
+		# Purge freed instances first (prevents typed-assignment crash).
+		b.attackers = (b.attackers as Array).filter(func(u): return is_instance_valid(u))
+		b.defenders = (b.defenders as Array).filter(func(u): return is_instance_valid(u))
+		# Detect deaths — spawn death poofs for units about to be removed.
+		for u in b.attackers:
+			if u.hp <= 0.0:
 				spawn_death_poof(u.global_position, FactionPalette.primary_color(u.clan_id))
-		for u2: Node3D in b.defenders:
-			if is_instance_valid(u2) and u2.hp <= 0.0:
+		for u2 in b.defenders:
+			if u2.hp <= 0.0:
 				spawn_death_poof(u2.global_position, FactionPalette.primary_color(u2.clan_id))
-		b.attackers = (b.attackers as Array).filter(func(u): return is_instance_valid(u) and u.hp > 0.0)
-		b.defenders = (b.defenders as Array).filter(func(u): return is_instance_valid(u) and u.hp > 0.0)
+		# Now filter out dead units.
+		b.attackers = (b.attackers as Array).filter(func(u): return u.hp > 0.0)
+		b.defenders = (b.defenders as Array).filter(func(u): return u.hp > 0.0)
 		# Extend enemy lists with the God-King if he is hostile to that side.
 		var attacker_enemies: Array = b.defenders.duplicate()
 		var defender_enemies: Array = b.attackers.duplicate()

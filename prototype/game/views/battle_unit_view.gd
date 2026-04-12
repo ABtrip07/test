@@ -54,6 +54,8 @@ func _build_meshes() -> void:
 	add_child(_hp_bar)
 
 func take_damage(amount: float) -> void:
+	if hp <= 0.0:
+		return
 	hp = maxf(0.0, hp - amount)
 	var r: float = clampf(hp / _max_hp, 0.0, 1.0)
 	_hp_bar.scale = Vector3(maxf(0.05, r), 1.0, 1.0)
@@ -64,6 +66,8 @@ func take_damage(amount: float) -> void:
 		queue_free()
 
 func _spawn_damage_label(amount: float) -> void:
+	if not is_inside_tree():
+		return
 	var lbl: Label3D = Label3D.new()
 	lbl.text = str(int(amount))
 	lbl.pixel_size = 0.035
