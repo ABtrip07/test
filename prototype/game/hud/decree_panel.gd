@@ -44,11 +44,17 @@ func _build_ui() -> void:
 	_add_button("[4] Recruit Levies", Color(1.0, 0.85, 0.55), "_recruit")
 
 	var hint: Label = Label.new()
-	hint.text = "[G] Drop in as God-King"
+	hint.text = "[G] God-King  LMB Swing  RMB Parry"
 	hint.add_theme_color_override("font_color", Color(0.9, 0.85, 0.7))
-	hint.add_theme_font_size_override("font_size", 12)
+	hint.add_theme_font_size_override("font_size", 11)
 	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_vbox.add_child(hint)
+	var hint2: Label = Label.new()
+	hint2.text = "Mouse aim = stance  WASD = move"
+	hint2.add_theme_color_override("font_color", Color(0.75, 0.72, 0.6))
+	hint2.add_theme_font_size_override("font_size", 10)
+	hint2.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_vbox.add_child(hint2)
 
 func _add_button(label: String, tint: Color, method: String) -> void:
 	var btn: Button = Button.new()

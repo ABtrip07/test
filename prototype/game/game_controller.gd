@@ -107,6 +107,8 @@ func _process(delta: float) -> void:
 	if _god_king_mode and _god_king:
 		_process_god_king_input(delta)
 		_god_king.visual_tick(delta)
+		if _hud and _hud.has_method("show_gk_hp"):
+			_hud.show_gk_hp(_god_king.hp, _god_king.max_hp)
 	# Cooldown decay for need-critical throttling
 	for key: Variant in _need_warn_cooldowns.keys():
 		_need_warn_cooldowns[key] = maxf(0.0, _need_warn_cooldowns[key] - delta)
@@ -454,6 +456,8 @@ func _enter_godking_mode() -> void:
 func _exit_godking_mode() -> void:
 	_god_king_mode = false
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	if _hud and _hud.has_method("hide_gk_hp"):
+		_hud.hide_gk_hp()
 	if _orbit_camera:
 		_orbit_camera.current = true
 	if _settlement and _settlement.has_method("clear_god_king"):
