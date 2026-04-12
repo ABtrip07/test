@@ -182,8 +182,28 @@ func _handle_gather_complete(_d: DecreeTypes.Decree) -> void:
 	Resources.add_resource(ResourceTypes.ResourceType.SCRAP, 25.0)
 	_push_event("Gather complete: +25 Scrap.", Color(0.6, 1.0, 0.7))
 
-func _handle_build_complete(_d: DecreeTypes.Decree) -> void:
-	_push_event("Build decree complete (hookup pending).", Color(0.8, 0.9, 1.0))
+func _handle_build_complete(d: DecreeTypes.Decree) -> void:
+	if not Resources.consume_resource(ResourceTypes.ResourceType.SCRAP, 30.0):
+		_push_event("Not enough scrap to build (need 30).", Color(1.0, 0.6, 0.5))
+		return
+	# Alternate between useful building types.
+	_auto_build_counter += 1
+	var btype: int
+	match _auto_build_counter % 3:
+		0: btype = BuildingTypes.BuildingType.BARRACKS
+		1: btype = BuildingTypes.BuildingType.FARM
+		_: btype = BuildingTypes.BuildingType.SHRINE
+	var bid: StringName = StringName("bld_%d" % _auto_build_counter)
+	var building: BuildingTypes.BuildingData = BuildingTypes.BuildingData.new(bid, btype as BuildingTypes.BuildingType)
+	building.lot_id = d.target_id
+	building.is_constructed = true
+	_economy.register_building(building)
+	var lot: LotTypes.LotData = Lots.get_lot_data(d.target_id)
+	var clan_id: StringName = lot.owning_clan_id if lot else PLAYER_CLAN
+	if _settlement:
+		_settlement.spawn_building(building, clan_id)
+	var type_name: String = BuildingTypes.BuildingType.keys()[btype]
+	_push_event("Built %s at %s (cost 30 scrap)." % [type_name, String(d.target_id)], Color(0.55, 0.85, 1.0))
 
 func _handle_attack_complete(d: DecreeTypes.Decree) -> void:
 	# AI-issued attack decree from a lieutenant (not the player-triggered raid).
@@ -238,7 +258,9 @@ func _on_projectile_impact(world_pos: Vector3, target_lot_id: StringName, attack
 	if not _settlement.has_active_battle(target_lot_id):
 		var lot: LotTypes.LotData = Lots.get_lot_data(target_lot_id)
 		var defender_clan: StringName = lot.owning_clan_id if lot else NEUTRAL_CLAN
-		_settlement.start_live_battle(target_lot_id, attacker_clan, defender_clan, 5, 4)
+		var atk_count: int = _get_raid_troop_count(attacker_clan)
+		var def_count: int = _get_defender_count(target_lot_id)
+		_settlement.start_live_battle(target_lot_id, attacker_clan, defender_clan, atk_count, def_count)
 		if _hud and _hud.has_method("show_raid_banner"):
 			_hud.show_raid_banner(
 				"BATTLE AT %s" % String(target_lot_id).to_upper(),
@@ -254,9 +276,16 @@ func _on_battle_resolved(lot_id: StringName, winning_clan: StringName) -> void:
 	var lot: LotTypes.LotData = Lots.get_lot_data(lot_id)
 	if lot and lot.owning_clan_id != winning_clan:
 		Lots.change_lot_owner(lot_id, winning_clan)
+	_check_win_lose()
 
 func _handle_recruit_complete(_d: DecreeTypes.Decree) -> void:
-	_push_event("Recruit complete (hookup pending).", Color(0.8, 0.9, 1.0))
+	if not Resources.consume_resource(ResourceTypes.ResourceType.FOOD, 20.0):
+		_push_event("Not enough food to recruit (need 20).", Color(1.0, 0.6, 0.5))
+		return
+	var squad: SquadTypes.SquadData = Army.get_squad(&"squad_alpha")
+	if squad:
+		squad.unit_count += 3
+	_push_event("Levies mustered: +3 troops (cost 20 food).", Color(0.6, 1.0, 0.7))
 
 func _on_villager_need_critical(vid: StringName, need: int) -> void:
 	var key: String = "%s::%d" % [String(vid), need]
@@ -267,6 +296,23 @@ func _on_villager_need_critical(vid: StringName, need: int) -> void:
 	var who: String = v.display_name if v else String(vid)
 	var need_name: String = VillagerTypes.VillagerNeed.keys()[need]
 	_push_event("%s cries out: %s critical" % [who, need_name], Color(1.0, 0.6, 0.4))
+
+## How many troops an attacker sends. Player count scales with Army size.
+## Rival gets a base count + slight scaling with threat.
+func _get_raid_troop_count(clan: StringName) -> int:
+	if clan == PLAYER_CLAN:
+		var squad: SquadTypes.SquadData = Army.get_squad(&"squad_alpha")
+		var total: int = squad.unit_count if squad else 5
+		return clampi(total / 3, 3, 10)  # send 1/3 of troops, 3 min, 10 max
+	else:
+		# Rival scales slightly with threat level
+		return clampi(4 + int(_rival_civ.threat_level / 8.0), 4, 8)
+
+## How many defenders a lot musters. Base 3, +1 per building on the lot.
+func _get_defender_count(lot_id: StringName) -> int:
+	var lot: LotTypes.LotData = Lots.get_lot_data(lot_id)
+	var building_count: int = lot.building_ids.size() if lot else 0
+	return clampi(3 + building_count, 3, 8)
 
 func _on_lot_ownership_changed(lot_id: StringName, new_owner: StringName) -> void:
 	if _settlement and _settlement.has_method("recolor_lot"):
@@ -416,7 +462,9 @@ func _enter_godking_mode() -> void:
 			var target_lot: LotTypes.LotData = Lots.get_lot_data(target_lot_id)
 			var defender_clan: StringName = target_lot.owning_clan_id if target_lot else NEUTRAL_CLAN
 			if not _settlement.has_active_battle(target_lot_id):
-				_settlement.start_live_battle(target_lot_id, PLAYER_CLAN, defender_clan, 5, 4)
+				var atk_n: int = _get_raid_troop_count(PLAYER_CLAN)
+				var def_n: int = _get_defender_count(target_lot_id)
+				_settlement.start_live_battle(target_lot_id, PLAYER_CLAN, defender_clan, atk_n, def_n)
 			_settlement.spawn_battle_puff(tv.global_position + Vector3(0, 1.2, 0), "CHARGE!", Color(1.0, 0.85, 0.3))
 			_push_event(
 				"The God-King leads the charge on %s!" % String(target_lot_id),
@@ -491,6 +539,26 @@ func _on_godking_died() -> void:
 			Color(1.0, 0.3, 0.25)
 		)
 	_exit_godking_mode()
+
+func _check_win_lose() -> void:
+	var player_lots: Array = Lots.get_lots_by_clan(PLAYER_CLAN)
+	var rival_lots: Array = Lots.get_lots_by_clan(RIVAL_CLAN)
+	if rival_lots.is_empty():
+		_push_event("ALL ENEMY TERRITORY CONQUERED!", Color(1.0, 0.95, 0.4))
+		if _hud and _hud.has_method("show_raid_banner"):
+			_hud.show_raid_banner(
+				"VICTORY",
+				"The Sigil reigns supreme across the land.",
+				Color(0.4, 1.0, 0.5)
+			)
+	elif player_lots.is_empty():
+		_push_event("THE COLLECTIVE HAS FALLEN!", Color(1.0, 0.3, 0.3))
+		if _hud and _hud.has_method("show_raid_banner"):
+			_hud.show_raid_banner(
+				"DEFEAT",
+				"The last banner falls...",
+				Color(1.0, 0.25, 0.2)
+			)
 
 func _pick_assault_target() -> StringName:
 	# Closest enemy (rival) lot to home_base. Falls back to any rival, then empty.
