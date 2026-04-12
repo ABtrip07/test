@@ -312,15 +312,35 @@ func _unhandled_input(event: InputEvent) -> void:
 func _process_god_king_input(delta: float) -> void:
 	if _god_king == null:
 		return
-	var move: Vector3 = Vector3.ZERO
+	# Auto-lock on the nearest enemy — god-king faces them, camera follows.
+	if _settlement and _settlement.has_method("get_nearest_enemy_to_god_king"):
+		var enemy: Node3D = _settlement.get_nearest_enemy_to_god_king()
+		if enemy and is_instance_valid(enemy):
+			_god_king.face_toward(enemy.global_position, delta)
+	# Camera-relative WASD: W = toward where the camera looks, not world-Z.
+	var input_fwd: float = 0.0
+	var input_right: float = 0.0
 	if Input.is_key_pressed(KEY_W):
-		move.z -= 1.0
+		input_fwd += 1.0
 	if Input.is_key_pressed(KEY_S):
-		move.z += 1.0
+		input_fwd -= 1.0
 	if Input.is_key_pressed(KEY_A):
-		move.x -= 1.0
+		input_right -= 1.0
 	if Input.is_key_pressed(KEY_D):
-		move.x += 1.0
+		input_right += 1.0
+	var move: Vector3
+	if _chase_camera and is_instance_valid(_chase_camera):
+		var cam_basis: Basis = _chase_camera.global_transform.basis
+		var cam_fwd: Vector3 = -cam_basis.z
+		cam_fwd.y = 0.0
+		cam_fwd = cam_fwd.normalized()
+		var cam_right: Vector3 = cam_basis.x
+		cam_right.y = 0.0
+		cam_right = cam_right.normalized()
+		move = cam_fwd * input_fwd + cam_right * input_right
+	else:
+		# Fallback to world-space if no chase camera
+		move = Vector3(input_right, 0.0, -input_fwd)
 	_god_king.process_movement(delta, move)
 
 func _handle_god_king_input(event: InputEvent) -> void:
@@ -426,6 +446,8 @@ func _enter_godking_mode() -> void:
 		_settlement.set_god_king(_god_king)
 	if _god_king.has_signal("hit_attempted") and not _god_king.hit_attempted.is_connected(_on_godking_hit):
 		_god_king.hit_attempted.connect(_on_godking_hit)
+	if _god_king.has_signal("damaged") and not _god_king.damaged.is_connected(_on_godking_damaged):
+		_god_king.damaged.connect(_on_godking_damaged)
 	if _god_king.has_signal("died") and not _god_king.died.is_connected(_on_godking_died):
 		_god_king.died.connect(_on_godking_died)
 
@@ -439,6 +461,8 @@ func _exit_godking_mode() -> void:
 	if _god_king:
 		if _god_king.hit_attempted.is_connected(_on_godking_hit):
 			_god_king.hit_attempted.disconnect(_on_godking_hit)
+		if _god_king.damaged.is_connected(_on_godking_damaged):
+			_god_king.damaged.disconnect(_on_godking_damaged)
 		if _god_king.died.is_connected(_on_godking_died):
 			_god_king.died.disconnect(_on_godking_died)
 		_god_king.queue_free()
@@ -447,6 +471,12 @@ func _exit_godking_mode() -> void:
 func _on_godking_hit(origin: Vector3, forward: Vector3, hit_range: float, arc_deg: float, dmg: float) -> void:
 	if _settlement and _settlement.has_method("resolve_god_king_hit"):
 		_settlement.resolve_god_king_hit(origin, forward, hit_range, arc_deg, dmg)
+
+func _on_godking_damaged(amount: float, world_pos: Vector3) -> void:
+	if _settlement and _settlement.has_method("spawn_damage_number"):
+		_settlement.spawn_damage_number(world_pos, amount, Color(1.0, 0.4, 0.35))
+	if _chase_camera and _chase_camera.has_method("shake"):
+		_chase_camera.shake(0.25)
 
 func _on_godking_died() -> void:
 	_push_event("THE GOD-KING HAS FALLEN!", Color(1.0, 0.3, 0.3))

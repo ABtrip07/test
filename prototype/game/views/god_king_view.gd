@@ -11,6 +11,7 @@ enum Stance { UP, DOWN_LEFT, DOWN_RIGHT }
 signal stance_changed(new_stance: int)
 signal swing_thrown(from_stance: int)
 signal hit_attempted(origin: Vector3, forward: Vector3, hit_range: float, arc_deg: float, dmg: float)
+signal damaged(amount: float, world_pos: Vector3)
 signal died()
 
 const RUN_SPEED: float = 7.5
@@ -41,6 +42,7 @@ var _parry_timer: float = 0.0
 var _dead: bool = false
 var _hit_flash_timer: float = 0.0
 var _body_base_col: Color
+var _auto_face_active: bool = false
 
 func setup(spawn_pos: Vector3) -> void:
 	global_position = spawn_pos
@@ -231,14 +233,31 @@ func update_stance_from_mouse(rel: Vector2) -> void:
 	else:
 		_set_stance(Stance.DOWN_LEFT)
 
+## Auto-lock the character toward a world position (nearest enemy).
+## When active, WASD strafes around the target instead of turning the character.
+func face_toward(target_pos: Vector3, delta: float) -> void:
+	if _is_swinging or _dead:
+		return
+	var dir: Vector3 = target_pos - global_position
+	dir.y = 0.0
+	if dir.length() < 0.1:
+		_auto_face_active = false
+		return
+	_auto_face_active = true
+	var desired_yaw: float = atan2(dir.x, dir.z)
+	_facing_deg = lerp_angle(_facing_deg, desired_yaw, TURN_SPEED * delta)
+	rotation.y = _facing_deg
+
 func process_movement(delta: float, move_vec: Vector3) -> void:
 	if _is_swinging or _dead:
 		return
 	if move_vec.length() > 0.05:
 		var desired: Vector3 = move_vec.normalized() * RUN_SPEED * delta
 		global_position += desired
-		_facing_deg = lerp_angle(_facing_deg, atan2(desired.x, desired.z), TURN_SPEED * delta)
-		rotation.y = _facing_deg
+		# Only turn toward movement when not locked on to an enemy.
+		if not _auto_face_active:
+			_facing_deg = lerp_angle(_facing_deg, atan2(desired.x, desired.z), TURN_SPEED * delta)
+			rotation.y = _facing_deg
 
 func swing() -> bool:
 	if _is_swinging or _dead:
@@ -276,6 +295,7 @@ func take_damage(amount: float) -> void:
 	_hit_flash_timer = 0.12
 	if _body and _body.material_override:
 		(_body.material_override as StandardMaterial3D).albedo_color = Color(1.0, 0.6, 0.5)
+	damaged.emit(amount, global_position)
 	if hp <= 0.0:
 		_dead = true
 		died.emit()

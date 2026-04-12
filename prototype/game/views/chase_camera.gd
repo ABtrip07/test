@@ -12,6 +12,9 @@ extends Camera3D
 @export var follow_smoothness: float = 12.0
 @export var look_ahead: float = 12.0   # How far ahead the camera looks
 
+var _shake_intensity: float = 0.0
+var _shake_decay: float = 8.0
+
 func attach(t: Node3D) -> void:
 	target = t
 	if target:
@@ -48,9 +51,21 @@ func _aim_parallel() -> void:
 	aim.y = target.global_position.y + 1.5
 	look_at(aim, Vector3.UP)
 
+func shake(intensity: float = 0.3) -> void:
+	_shake_intensity = maxf(_shake_intensity, intensity)
+
 func _process(delta: float) -> void:
 	if target == null:
 		return
 	var desired: Vector3 = _desired_position()
 	global_position = global_position.lerp(desired, clampf(delta * follow_smoothness, 0.0, 1.0))
+	# Apply screen shake
+	if _shake_intensity > 0.01:
+		var offset: Vector3 = Vector3(
+			randf_range(-_shake_intensity, _shake_intensity),
+			randf_range(-_shake_intensity, _shake_intensity) * 0.5,
+			randf_range(-_shake_intensity, _shake_intensity)
+		)
+		global_position += offset
+		_shake_intensity = maxf(0.0, _shake_intensity - _shake_decay * delta)
 	_aim_parallel()

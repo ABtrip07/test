@@ -147,8 +147,15 @@ func _tick_battles(delta: float) -> void:
 	var gk_clan: StringName = _god_king_ref.clan_id if gk_alive else &""
 	for lot_id: StringName in _active_battles.keys():
 		var b: Dictionary = _active_battles[lot_id]
-		b.attackers = (b.attackers as Array).filter(func(u): return is_instance_valid(u))
-		b.defenders = (b.defenders as Array).filter(func(u): return is_instance_valid(u))
+		# Detect deaths before filtering — spawn death poofs and damage numbers.
+		for u: Node3D in b.attackers:
+			if is_instance_valid(u) and u.hp <= 0.0:
+				spawn_death_poof(u.global_position, FactionPalette.primary_color(u.clan_id))
+		for u2: Node3D in b.defenders:
+			if is_instance_valid(u2) and u2.hp <= 0.0:
+				spawn_death_poof(u2.global_position, FactionPalette.primary_color(u2.clan_id))
+		b.attackers = (b.attackers as Array).filter(func(u): return is_instance_valid(u) and u.hp > 0.0)
+		b.defenders = (b.defenders as Array).filter(func(u): return is_instance_valid(u) and u.hp > 0.0)
 		# Extend enemy lists with the God-King if he is hostile to that side.
 		var attacker_enemies: Array = b.defenders.duplicate()
 		var defender_enemies: Array = b.attackers.duplicate()
@@ -172,6 +179,28 @@ func set_god_king(gk: Node3D) -> void:
 
 func clear_god_king() -> void:
 	_god_king_ref = null
+
+## Find the closest hostile battle unit to the God-King across all active battles.
+func get_nearest_enemy_to_god_king() -> Node3D:
+	if _god_king_ref == null or not is_instance_valid(_god_king_ref):
+		return null
+	var gk_clan: StringName = _god_king_ref.clan_id
+	var gk_pos: Vector3 = _god_king_ref.global_position
+	var best: Node3D = null
+	var best_dist: float = 1e9
+	for lot_id: StringName in _active_battles.keys():
+		var b: Dictionary = _active_battles[lot_id]
+		var all_units: Array = (b.attackers as Array) + (b.defenders as Array)
+		for u: Node3D in all_units:
+			if u == null or not is_instance_valid(u):
+				continue
+			if u.clan_id == gk_clan:
+				continue
+			var d: float = gk_pos.distance_to(u.global_position)
+			if d < best_dist:
+				best_dist = d
+				best = u
+	return best
 
 ## Apply a God-King melee swing. Hits any non-friendly battle unit within the
 ## given arc + range across all active battles.
@@ -199,7 +228,7 @@ func resolve_god_king_hit(origin: Vector3, forward: Vector3, hit_range: float, a
 				continue
 			u.take_damage(dmg)
 			hit_any = true
-			spawn_battle_puff(u.global_position + Vector3(0, 1.4, 0), "SLASH!", Color(1.0, 0.95, 0.45))
+			spawn_damage_number(u.global_position, dmg, Color(1.0, 0.95, 0.4))
 	if not hit_any:
 		spawn_battle_puff(origin + forward * (hit_range * 0.55) + Vector3(0, 0.4, 0), "MISS", Color(0.7, 0.7, 0.8))
 
@@ -217,6 +246,48 @@ func _resolve_battle(lot_id: StringName) -> void:
 			u2.queue_free()
 	_active_battles.erase(lot_id)
 	battle_resolved.emit(lot_id, winner)
+
+## Floating damage number — rises and fades out over 0.8s.
+func spawn_damage_number(world_pos: Vector3, amount: float, color: Color = Color(1, 0.95, 0.5)) -> void:
+	var lbl: Label3D = Label3D.new()
+	lbl.text = str(int(amount))
+	lbl.pixel_size = 0.04
+	lbl.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	lbl.no_depth_test = true
+	lbl.modulate = color
+	lbl.outline_size = 8
+	lbl.outline_modulate = Color(0.05, 0.02, 0.0)
+	lbl.position = world_pos + Vector3(randf_range(-0.4, 0.4), 2.0, randf_range(-0.4, 0.4))
+	_battles_container.add_child(lbl)
+	var tw: Tween = lbl.create_tween()
+	tw.set_parallel(true)
+	tw.tween_property(lbl, "position:y", lbl.position.y + 2.5, 0.8) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.tween_property(lbl, "modulate:a", 0.0, 0.8) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tw.chain().tween_callback(func(): lbl.queue_free())
+
+## Small poof when a unit dies — quick expand + fade.
+func spawn_death_poof(world_pos: Vector3, clan_color: Color) -> void:
+	var poof: MeshInstance3D = MeshInstance3D.new()
+	var sph: SphereMesh = SphereMesh.new()
+	sph.radius = 0.6
+	sph.height = 1.2
+	poof.mesh = sph
+	var mat: StandardMaterial3D = StandardMaterial3D.new()
+	mat.albedo_color = Color(clan_color.r, clan_color.g, clan_color.b, 0.85)
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	poof.material_override = mat
+	poof.position = world_pos + Vector3(0, 0.8, 0)
+	_battles_container.add_child(poof)
+	var tw: Tween = poof.create_tween()
+	tw.set_parallel(true)
+	tw.tween_property(poof, "scale", Vector3(3.0, 3.0, 3.0), 0.5) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.tween_method(func(a: float): mat.albedo_color.a = a, 0.85, 0.0, 0.5) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tw.chain().tween_callback(func(): poof.queue_free())
 
 func spawn_battle_puff(world_pos: Vector3, text: String = "POW!", tint: Color = Color(1, 0.9, 0.5)) -> void:
 	var bp: Node3D = Node3D.new()

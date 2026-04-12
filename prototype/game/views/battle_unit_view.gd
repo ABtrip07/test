@@ -58,9 +58,34 @@ func take_damage(amount: float) -> void:
 	var r: float = clampf(hp / _max_hp, 0.0, 1.0)
 	_hp_bar.scale = Vector3(maxf(0.05, r), 1.0, 1.0)
 	_hp_mat.albedo_color = Color(1.0 - r, r, 0.3)
+	_spawn_damage_label(amount)
 	if hp <= 0.0:
 		died.emit(self)
 		queue_free()
+
+func _spawn_damage_label(amount: float) -> void:
+	var lbl: Label3D = Label3D.new()
+	lbl.text = str(int(amount))
+	lbl.pixel_size = 0.035
+	lbl.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	lbl.no_depth_test = true
+	lbl.modulate = Color(1.0, 0.85, 0.35)
+	lbl.outline_size = 6
+	lbl.outline_modulate = Color(0.05, 0.02, 0.0)
+	lbl.global_position = global_position + Vector3(randf_range(-0.3, 0.3), 2.2, randf_range(-0.3, 0.3))
+	# Add to parent container so the label survives if this unit dies.
+	var p: Node = get_parent()
+	if p:
+		p.add_child(lbl)
+	else:
+		add_child(lbl)
+	var tw: Tween = lbl.create_tween()
+	tw.set_parallel(true)
+	tw.tween_property(lbl, "position:y", lbl.position.y + 1.8, 0.7) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.tween_property(lbl, "modulate:a", 0.0, 0.7) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tw.chain().tween_callback(func(): lbl.queue_free())
 
 func tick_combat(delta: float, enemies: Array) -> void:
 	if enemies.is_empty():
