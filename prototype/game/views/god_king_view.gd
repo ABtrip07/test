@@ -207,6 +207,8 @@ func _set_stance(new_stance: int) -> void:
 			_sword_pivot.rotation = Vector3(0, 0, deg_to_rad(-55))
 	stance_changed.emit(current_stance)
 
+const STANCE_DEADZONE: float = 3.0  # pixels — ignore tiny jitter
+
 func set_stance_by_input(up: bool, left: bool, right: bool) -> void:
 	if up:
 		_set_stance(Stance.UP)
@@ -214,6 +216,20 @@ func set_stance_by_input(up: bool, left: bool, right: bool) -> void:
 		_set_stance(Stance.DOWN_LEFT)
 	elif right:
 		_set_stance(Stance.DOWN_RIGHT)
+
+## Map mouse (or right-stick) delta to the three For Honor guard zones.
+## Three equal 120° sectors: UP (mouse moves upward), DOWN_LEFT, DOWN_RIGHT.
+func update_stance_from_mouse(rel: Vector2) -> void:
+	if rel.length() < STANCE_DEADZONE:
+		return  # dead zone — ignore sub-pixel jitter
+	# angle 0 = pure upward movement, positive = clockwise
+	var angle: float = atan2(rel.x, -rel.y)
+	if angle >= deg_to_rad(-60.0) and angle < deg_to_rad(60.0):
+		_set_stance(Stance.UP)
+	elif angle >= deg_to_rad(60.0):
+		_set_stance(Stance.DOWN_RIGHT)
+	else:
+		_set_stance(Stance.DOWN_LEFT)
 
 func process_movement(delta: float, move_vec: Vector3) -> void:
 	if _is_swinging or _dead:

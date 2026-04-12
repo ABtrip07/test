@@ -323,8 +323,19 @@ func _process_god_king_input(delta: float) -> void:
 		move.x += 1.0
 	_god_king.process_movement(delta, move)
 
-func _handle_god_king_input(_event: InputEvent) -> void:
-	pass  # Reserved for mouse input wiring later
+func _handle_god_king_input(event: InputEvent) -> void:
+	if _god_king == null:
+		return
+	# Mouse motion → stance selection (For Honor right-stick feel)
+	if event is InputEventMouseMotion:
+		_god_king.update_stance_from_mouse((event as InputEventMouseMotion).relative)
+	# Mouse buttons → swing / parry
+	elif event is InputEventMouseButton and (event as InputEventMouseButton).pressed:
+		var btn: int = (event as InputEventMouseButton).button_index
+		if btn == MOUSE_BUTTON_LEFT:
+			_god_king.swing()
+		elif btn == MOUSE_BUTTON_RIGHT:
+			_god_king.start_parry()
 
 # ---------- Public decree triggers (called by HUD buttons + hotkeys) ----------
 
@@ -408,6 +419,8 @@ func _enter_godking_mode() -> void:
 		$World.add_child(_chase_camera)
 	_chase_camera.attach(_god_king)
 	_chase_camera.current = true
+	# Capture mouse so relative motion drives the stance (like a right stick).
+	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	# Wire the God-King into the combat layer so he can kill and be killed.
 	if _settlement and _settlement.has_method("set_god_king"):
 		_settlement.set_god_king(_god_king)
@@ -418,6 +431,7 @@ func _enter_godking_mode() -> void:
 
 func _exit_godking_mode() -> void:
 	_god_king_mode = false
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	if _orbit_camera:
 		_orbit_camera.current = true
 	if _settlement and _settlement.has_method("clear_god_king"):
