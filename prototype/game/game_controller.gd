@@ -40,6 +40,7 @@ const ChaseCameraScript := preload("res://game/views/chase_camera.gd")
 var _god_king: Node3D
 var _chase_camera: Camera3D
 var _god_king_mode: bool = false
+var _gk_kills: int = 0
 
 func _ready() -> void:
 	randomize()
@@ -108,7 +109,7 @@ func _process(delta: float) -> void:
 		_process_god_king_input(delta)
 		_god_king.visual_tick(delta)
 		if _hud and _hud.has_method("show_gk_hp"):
-			_hud.show_gk_hp(_god_king.hp, _god_king.max_hp)
+			_hud.show_gk_hp(_god_king.hp, _god_king.max_hp, _gk_kills)
 	# Cooldown decay for need-critical throttling
 	for key: Variant in _need_warn_cooldowns.keys():
 		_need_warn_cooldowns[key] = maxf(0.0, _need_warn_cooldowns[key] - delta)
@@ -297,15 +298,25 @@ func _on_villager_need_critical(vid: StringName, need: int) -> void:
 	var need_name: String = VillagerTypes.VillagerNeed.keys()[need]
 	_push_event("%s cries out: %s critical" % [who, need_name], Color(1.0, 0.6, 0.4))
 
+## Count player buildings of a specific type across all player-owned lots.
+func _count_player_buildings(btype: BuildingTypes.BuildingType) -> int:
+	var count: int = 0
+	for building: BuildingTypes.BuildingData in _economy.get_all_buildings():
+		if building.building_type == btype:
+			var lot: LotTypes.LotData = Lots.get_lot_data(building.lot_id)
+			if lot and lot.owning_clan_id == PLAYER_CLAN:
+				count += 1
+	return count
+
 ## How many troops an attacker sends. Player count scales with Army size.
-## Rival gets a base count + slight scaling with threat.
+## Each Barracks the player owns raises the max cap by 1.
 func _get_raid_troop_count(clan: StringName) -> int:
 	if clan == PLAYER_CLAN:
 		var squad: SquadTypes.SquadData = Army.get_squad(&"squad_alpha")
 		var total: int = squad.unit_count if squad else 5
-		return clampi(total / 3, 3, 10)  # send 1/3 of troops, 3 min, 10 max
+		var max_troops: int = 10 + _count_player_buildings(BuildingTypes.BuildingType.BARRACKS)
+		return clampi(total / 3, 3, max_troops)
 	else:
-		# Rival scales slightly with threat level
 		return clampi(4 + int(_rival_civ.threat_level / 8.0), 4, 8)
 
 ## How many defenders a lot musters. Base 3, +1 per building on the lot.
@@ -474,6 +485,9 @@ func _enter_godking_mode() -> void:
 			var home_view: Node3D = _settlement.get_lot_view(&"home_base")
 			drop_pos = (home_view.global_position if home_view else Vector3.ZERO) + Vector3(6, 0, 6)
 			_push_event("The God-King strides onto the field — no foes in sight.", Color(0.9, 0.95, 1.0))
+	_gk_kills = 0
+	# Apply Shrine bonus: each Shrine adds +15 max HP.
+	var shrine_bonus: float = _count_player_buildings(BuildingTypes.BuildingType.SHRINE) * 15.0
 	if _god_king == null:
 		_god_king = Node3D.new()
 		_god_king.set_script(GodKingViewScript)
@@ -482,6 +496,8 @@ func _enter_godking_mode() -> void:
 		_god_king.setup(drop_pos)
 	else:
 		_god_king.global_position = drop_pos
+	_god_king.max_hp = _god_king.MAX_HP + shrine_bonus
+	_god_king.hp = _god_king.max_hp
 	if _chase_camera == null:
 		_chase_camera = Camera3D.new()
 		_chase_camera.set_script(ChaseCameraScript)
@@ -522,7 +538,8 @@ func _exit_godking_mode() -> void:
 
 func _on_godking_hit(origin: Vector3, forward: Vector3, hit_range: float, arc_deg: float, dmg: float) -> void:
 	if _settlement and _settlement.has_method("resolve_god_king_hit"):
-		_settlement.resolve_god_king_hit(origin, forward, hit_range, arc_deg, dmg)
+		var kills: int = _settlement.resolve_god_king_hit(origin, forward, hit_range, arc_deg, dmg)
+		_gk_kills += kills
 
 func _on_godking_damaged(amount: float, world_pos: Vector3) -> void:
 	if _settlement and _settlement.has_method("spawn_damage_number"):

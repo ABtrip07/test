@@ -204,12 +204,14 @@ func get_nearest_enemy_to_god_king() -> Node3D:
 
 ## Apply a God-King melee swing. Hits any non-friendly battle unit within the
 ## given arc + range across all active battles.
-func resolve_god_king_hit(origin: Vector3, forward: Vector3, hit_range: float, arc_deg: float, dmg: float) -> void:
+## Returns the number of kills scored by this swing.
+func resolve_god_king_hit(origin: Vector3, forward: Vector3, hit_range: float, arc_deg: float, dmg: float) -> int:
 	if _god_king_ref == null or not is_instance_valid(_god_king_ref):
-		return
+		return 0
 	var gk_clan: StringName = _god_king_ref.clan_id
 	var cos_thresh: float = cos(deg_to_rad(arc_deg * 0.5))
 	var hit_any: bool = false
+	var kills: int = 0
 	for lot_id: StringName in _active_battles.keys():
 		var b: Dictionary = _active_battles[lot_id]
 		var all_units: Array = (b.attackers as Array) + (b.defenders as Array)
@@ -229,8 +231,11 @@ func resolve_god_king_hit(origin: Vector3, forward: Vector3, hit_range: float, a
 			u.take_damage(dmg)
 			hit_any = true
 			spawn_damage_number(u.global_position, dmg, Color(1.0, 0.95, 0.4))
+			if u.hp <= 0.0:
+				kills += 1
 	if not hit_any:
 		spawn_battle_puff(origin + forward * (hit_range * 0.55) + Vector3(0, 0.4, 0), "MISS", Color(0.7, 0.7, 0.8))
+	return kills
 
 func _resolve_battle(lot_id: StringName) -> void:
 	var b: Dictionary = _active_battles[lot_id]

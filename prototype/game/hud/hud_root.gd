@@ -143,13 +143,14 @@ func _build_gk_hp_bar() -> void:
 	_gk_hp_bar.add_theme_stylebox_override("background", bg)
 	vb.add_child(_gk_hp_bar)
 
-func show_gk_hp(hp: float, max_hp: float) -> void:
+func show_gk_hp(hp: float, max_hp: float, kills: int = 0) -> void:
 	if _gk_hp_panel == null:
 		return
 	_gk_hp_panel.visible = true
 	_gk_hp_bar.max_value = max_hp
 	_gk_hp_bar.value = hp
-	_gk_hp_label.text = "GOD-KING  %d / %d" % [int(hp), int(max_hp)]
+	var kills_str: String = "  KILLS: %d" % kills if kills > 0 else ""
+	_gk_hp_label.text = "GOD-KING  %d / %d%s" % [int(hp), int(max_hp), kills_str]
 	# Color shifts red as HP drops.
 	var r: float = clampf(hp / max_hp, 0.0, 1.0)
 	var fg: StyleBoxFlat = _gk_hp_bar.get_theme_stylebox("fill") as StyleBoxFlat
