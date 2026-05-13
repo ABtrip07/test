@@ -1,71 +1,38 @@
-# Unreal Engine generated
-Binaries/
-DerivedDataCache/
-Intermediate/
-Saved/
-Build/
+node_modules/
+.expo/
+dist/
+web-build/
+*.tsbuildinfo
 
-# But keep Build config whitelists
-!Build/*/
-Build/*/*
-!Build/*/PakBlacklist*.txt
-!Build/**/*.ico
+# Native
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+ios/Pods/
+ios/build/
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
 
-# Built data for maps
-*_BuiltData.uasset
+# Env
+.env
+.env.local
+.env.*.local
 
-# Visual Studio / Rider
-.vs/
-.vscode/
-.idea/
-*.sln
-*.suo
-*.opensdf
-*.sdf
-*.VC.db
-*.VC.opendb
-.vsconfig
-
-# Compiled object files
-*.slo
-*.lo
-*.o
-*.obj
-
-# Precompiled headers
-*.gch
-*.pch
-
-# Compiled libraries
-*.so
-*.dylib
-*.dll
-*.lai
-*.la
-*.a
-*.lib
-
-# Executables
-*.exe
-*.out
-*.app
-*.ipa
-
-# Precompiled assets
-SourceArt/**/*.png
-SourceArt/**/*.tga
-
-# Plugin binaries/intermediates
-Plugins/**/Binaries/*
-Plugins/**/Intermediate/*
-
-# OS files
+# OS
 .DS_Store
 Thumbs.db
 
-# Crashpad
-crashpad/
+# Editors
+.vscode/
+.idea/
+*.swp
 
-# Dev screenshots (Xvfb visual verification during iteration)
-shot_*.png
-/tmp/godot_boot.log
+# Logs
+npm-debug.*
+yarn-debug.*
+yarn-error.*

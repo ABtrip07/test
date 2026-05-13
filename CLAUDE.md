@@ -1,60 +1,67 @@
-# CLAUDE.md - The Last Collective
+# CLAUDE.md - heybud
 
-## Project Overview
-Post-apocalyptic civilization builder (UE5 C++). Player is a God-King war leader
-managing a settlement via decree-based orders (not direct micromanagement). Dual faction
-system: Sigil Collective (alchemy/magic) vs Quantists (quantum tech). Features idle/offline
-progression, villager AI with personality and relationships, Junkbot armies, and lot-based
-territory control.
+## Product
+heybud is a mobile-first routing app for cannabis users. Enter a destination,
+get dispensaries and munchie stops along the route, ranked by detour cost
+(minutes added) rather than raw distance.
 
-## Engine & Build
-- Unreal Engine 5.5, C++ primary (Blueprints for UI/prototyping only)
-- Single module: TheLastCollective
-- Build: UnrealBuildTool via .Build.cs / .Target.cs
-- Plugins: EnhancedInput, GameplayAbilities (GAS)
+Tagline: Dispensaries and munchies, on the way.
+Domain: heybudhq.com
 
-## Architecture Decisions
-- **Villager hybrid model**: On-screen villagers = full AActor with components.
-  Off-screen = FVillagerData struct ticked in UVillagerSubsystem. Transition at
-  camera frustum boundary.
-- **Subsystem pattern**: UResourceSubsystem (GameInstanceSubsystem), UVillagerSubsystem
-  (WorldSubsystem), UWorldMapSubsystem (WorldSubsystem), UWarMapSubsystem (WorldSubsystem).
-- **Combat mode switch**: Camera + input context swap. No level streaming or map change.
-  GodKingPlayerController handles the transition.
-- **Lot system**: FLotData is a serializable data chunk. ULotSystem manages a TMap of lot IDs
-  to FLotData.
-- **Decree system**: Player issues decrees (high-level orders). Lieutenants interpret and
-  execute via ULieutenantAI. This is the core "hands-off king" feel.
+## Stack
+- Expo (React Native) + TypeScript
+- Google Maps SDK: Directions + Places autocomplete
+- Dispensary data: Weedmaps API (primary), Leafly (fallback)
+- Munchie data: Google Places filtered to a curated category whitelist
+- State: lightweight (Zustand or React Context) — no global Redux
 
-## Coding Standards
-- **Naming**: UE5 conventions. Prefix: A (Actor), U (UObject/Component), F (struct), E (enum),
-  I (interface), T (template). No Hungarian notation beyond UE prefixes.
-- **File organization**: One class per file. File name matches class name (without prefix).
-  e.g., UVillagerComponent -> VillagerComponent.h/.cpp
-- **Headers**: Always include CoreMinimal.h first, then system headers, then project headers,
-  then the .generated.h last.
-- **UPROPERTY/UFUNCTION**: Always specify category. Use EditAnywhere/BlueprintReadWrite for
-  designer-tunable values. Use BlueprintReadOnly for state. Use VisibleAnywhere for components.
-- **Forward declarations**: Prefer forward declarations in headers over #include. Include in .cpp.
-- **Subsystems over singletons**: Never use raw singletons. Use UE5 subsystem framework.
-- **No raw new/delete**: Use UE5 memory management (NewObject, CreateDefaultSubobject, etc.)
-- **Comments**: Use /** */ doc comments for UCLASS, USTRUCT, UPROPERTY, UFUNCTION declarations.
-  Brief description of purpose. No obvious comments.
-- **Modules**: Single module for Phase 0. May split into gameplay modules later
-  (e.g., TLC_Combat, TLC_Simulation) when the codebase grows.
+## Architecture
+- `src/screens/` — one screen per file (AgeGate, Home, Results)
+- `src/components/` — reusable presentational components
+- `src/theme/` — colors, typography, spacing tokens. No inline magic numbers.
+- `src/routing/` — pure functions for detour math and stop insertion
+- `src/services/` — API clients (places, directions, dispensaries, munchies).
+  Stubs by default; wire real keys via `.env`.
+- `src/state/` — app-level state (destination, toggles, results)
+- `src/types/` — shared TypeScript types
 
-## Directory Structure (Source/TheLastCollective/)
-- VillagerSimulation/ - Villager AI, personality, relationships, needs
-- WorldBuilding/ - Buildings, construction, decree system
-- ResourceEconomy/ - Resource types, production, consumption, trading
-- CombatStrategic/ - Army management, squads, lieutenants, combat resolution
-- CombatPersonal/ - God-King 3rd person character and combat components
-- CameraUI/ - Player controller, camera system, HUD
-- WorldMap/ - World map, lots, clans, rival civilizations, war map
+## Routing algorithm (the differentiator)
+1. Compute baseline direct route: origin → destination
+2. Pre-filter candidates by route-corridor bounding box
+3. For each candidate, detour cost = (origin → stop → destination) − baseline
+4. For dispensary + munchies combo: dispensary inserted before munchies
+   (user wants munchies near destination, not before pickup)
+5. Cap candidates at ~10 per category before insertion math; cache aggressively
 
-## Key Patterns
-- GameMode sets default pawn to AGodKingCharacter, controller to AGodKingPlayerController
-- Resource system lives on GameInstance (persists across map transitions)
-- World-scoped subsystems (Villager, WorldMap, WarMap) reset per level
-- All gameplay-critical data structures use USTRUCT(BlueprintType) for serialization
-- Decree system uses a command pattern: FDecree -> UDecreeSystem -> ULieutenantAI
+## Design system
+- Premium, restrained, dark-first. Think Linear / Arc / Things 3.
+- Background: near-black (`#0A0A0A` family)
+- Accent: warm amber. Never green.
+- Typography: Inter. Single family, weight does the work.
+- Wordmark: lowercase `heybud`, no caps in UI.
+- Animations: spring physics, slow. Premium feels unhurried.
+- Haptics on iOS for selections and route updates.
+
+## Voice
+Conversational, dry, confident. Never winks. No weed puns or emoji-as-personality.
+Vocabulary: "dispensary" and "munchies" — own those words.
+
+## Compliance
+- 21+ age gate before any cannabis content
+- Apple App Store has historically rejected cannabis apps — research current
+  policy before submitting. May need web app + sideload route initially.
+- Geofence dispensary results to legal states
+- Display + handoff only. Do not facilitate purchase in-app.
+
+## Out of scope for v0
+Accounts, favorites, history, pre-order, push, deals, reviews, social,
+multi-stop beyond dispensary + munchies.
+
+## Coding standards
+- TypeScript strict mode
+- One component per file; filename matches export
+- Functional components with hooks; no class components
+- No default exports for components — named exports for greppability
+- Theme tokens for all colors/spacing/typography; no inline hex or magic numbers
+- Service layer returns typed data; UI never talks to APIs directly
+- Comments only when the WHY is non-obvious
