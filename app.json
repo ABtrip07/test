@@ -9,24 +9,22 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.heybudhq.heybud",
-      "config": {
-        "googleMapsApiKey": "REPLACE_WITH_IOS_GOOGLE_MAPS_KEY"
-      }
+      "bundleIdentifier": "com.heybudhq.heybud"
     },
     "android": {
-      "package": "com.heybudhq.heybud",
-      "config": {
-        "googleMaps": {
-          "apiKey": "REPLACE_WITH_ANDROID_GOOGLE_MAPS_KEY"
-        }
-      }
+      "package": "com.heybudhq.heybud"
     },
     "web": {
       "bundler": "metro"
     },
     "plugins": [
-      "expo-router"
+      "expo-router",
+      [
+        "@rnmapbox/maps",
+        {
+          "RNMapboxMapsDownloadToken": "REPLACE_WITH_MAPBOX_DOWNLOAD_TOKEN"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

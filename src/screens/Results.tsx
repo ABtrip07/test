@@ -198,7 +198,7 @@ export function Results() {
             accessibilityRole="button"
             accessibilityLabel="Back"
           >
-            <Text style={styles.backLabel}>‹ Back</Text>
+            <Text style={styles.backLabel}>‹ back</Text>
           </Pressable>
           <Text style={styles.destinationLabel} numberOfLines={1}>
             {destinationName}
