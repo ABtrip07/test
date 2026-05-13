@@ -1,5 +1,11 @@
 import type { LatLng, Place } from '@/types';
 
+// Real implementation will call Mapbox Search Box:
+//   GET /search/searchbox/v1/suggest?q=...    (autocomplete)
+//   GET /search/searchbox/v1/retrieve/{id}    (place details)
+// See @/services/mapbox/client for endpoint constants and token plumbing.
+// v0 returns filtered mock places so the UI flow works without a token.
+
 const MIN_LATENCY_MS = 50;
 const MAX_LATENCY_MS = 150;
 

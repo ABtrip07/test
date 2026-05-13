@@ -2,6 +2,12 @@ import { haversineKm } from '@/routing/corridor';
 import type { RouteRequest, RouteResponse } from '@/routing/types';
 import type { LatLng } from '@/types';
 
+// Real implementation will call Mapbox Directions / Matrix:
+//   GET /directions/v5/mapbox/driving-traffic/{coords}
+//   GET /directions-matrix/v1/mapbox/driving-traffic/{coords}
+// See @/services/mapbox/client for endpoint constants and token plumbing.
+// v0 returns a mock duration derived from haversine distance + avg city speed.
+
 const MIN_LATENCY_MS = 50;
 const MAX_LATENCY_MS = 150;
 const AVG_CITY_SPEED_KMH = 40;

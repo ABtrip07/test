@@ -23,8 +23,10 @@ to most added time.
 - **Expo SDK 51** — managed workflow, iOS, Android, and web targets.
 - **Expo Router** — file-system routing under `app/`.
 - **TypeScript strict** — `strict: true`, `noUncheckedIndexedAccess`, `noImplicitOverride`.
-- **Mapbox** — `@rnmapbox/maps` on native, `mapbox-gl` on web. Faster and more customizable than Google Maps; fully restyleable to match heybud's dark aesthetic.
-- **Google Maps Platform** — Directions API and Places Autocomplete for routing and search (Google's coverage beats Mapbox's for these specifically).
+- **Mapbox** — one provider for everything map-related:
+  - **Maps SDK** (`@rnmapbox/maps` on native, `mapbox-gl` on web) — fast, fully restyleable to match heybud's dark aesthetic.
+  - **Directions API** + **Matrix API** — baseline route + batched via-stop durations powering the detour math.
+  - **Search Box API** — destination autocomplete and place details.
 - **Zustand** — lightweight app state (destination, toggles, results).
 
 ## Project structure
@@ -64,15 +66,16 @@ Copy `.env.example` to `.env` and fill in values before using live data.
 
 | Variable | Purpose |
 |---|---|
-| `EXPO_PUBLIC_GOOGLE_MAPS_API_KEY` | Google Maps Platform — Directions API + Places Autocomplete |
-| `EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN` | Mapbox — map rendering on native and web |
-| `EXPO_PUBLIC_WEEDMAPS_API_KEY` | Dispensary listings (deferred — v0 uses curated Google Places results) |
+| `EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN` | Mapbox public token (`pk.*`) — Maps SDK + Directions + Matrix + Search Box. Restrict to your domain and bundle IDs in the Mapbox dashboard before shipping. |
+| `EXPO_PUBLIC_WEEDMAPS_API_KEY` | Dispensary listings (deferred — v0 uses a curated allowlist). |
+
+For native iOS/Android builds you'll also need a **secret** Mapbox download token (`sk.*` with `DOWNLOADS:READ` scope) configured in `app.json` under the `@rnmapbox/maps` plugin. This token only fetches the SDK at build time and never ships in the app binary.
 
 ## Routing algorithm
 
 The detour ranking is the core differentiator:
 
-- Compute baseline: origin → destination via Google Directions.
+- Compute baseline: origin → destination via Mapbox Directions.
 - Pre-filter candidates to a bounding-box corridor around the route.
 - For each candidate stop, detour cost = (origin → stop → destination) − baseline, converted to minutes and clamped at zero.
 - Stops with detour > 60 minutes are dropped.
@@ -91,7 +94,7 @@ The detour ranking is the core differentiator:
 
 ## Roadmap
 
-- **v1: Real APIs** — wire Google Maps Platform + Mapbox; replace service stubs with live calls.
+- **v1: Real APIs** — wire the Mapbox token through `src/services/mapbox/client.ts`; replace service stubs with live Directions / Matrix / Search Box calls.
 - **v1: Web parity** — primary launch surface is heybudhq.com (no App Store gate). Native apps follow once policy risk is cleared.
 - **v1: Live preview map + nav handoff** — render route + stop pins inside heybud; one-tap handoff to user's preferred nav (Google Maps / Apple Maps / Waze).
 - **v1: Persistence** — AsyncStorage for recent destinations and user preferences.
