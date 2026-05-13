@@ -116,3 +116,17 @@ The detour ranking is the core differentiator:
 | `npm start` | Start the Expo dev server |
 | `npm run typecheck` | Run `tsc --noEmit` for type checking without building |
 | `npm test` | Run Jest unit tests |
+| `bash scripts/deploy.sh` | Build the web bundle and produce a timestamped zip ready for Hostinger deploy |
+
+## Deploy
+
+Web target deploys to `heybudhq.com` on Hostinger. Run `bash scripts/deploy.sh`
+from a local terminal (cloud Claude Code sessions are sandboxed away from
+Hostinger's API). The script builds `dist/` via `expo export -p web`, zips it
+as `heybud_<timestamp>.zip`, and prints two finish options:
+
+1. **Local Claude Code + Hostinger MCP**: `claude` in the repo, ask it to
+   "deploy heybud_<timestamp>.zip to heybudhq.com" — invokes
+   `hosting_deployStaticWebsite` directly.
+2. **Manual**: upload the zip via Hostinger File Manager or SFTP into
+   `public_html/`.
