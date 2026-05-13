@@ -26,3 +26,13 @@ export const MAPBOX_ENDPOINTS = {
   searchSuggest: '/search/searchbox/v1/suggest',
   searchRetrieve: '/search/searchbox/v1/retrieve',
 } as const;
+
+// Cheap, non-cryptographic UUID v4 — fine for Mapbox session tokens, which
+// only need to be unique per autocomplete session (one billed unit per session).
+export function uuid(): string {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
