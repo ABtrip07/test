@@ -1,0 +1,61 @@
+name: Deploy heybud to Hostinger
+
+# Trigger on every push to the active feature branch + main.
+# Adjust branch list as needed.
+on:
+  push:
+    branches:
+      - main
+      - claude/dispensary-finder-app-Kfx4Y
+  workflow_dispatch: # allow manual re-run from the Actions tab
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    name: Build web bundle and push to Hostinger via SFTP
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install deps
+        # --legacy-peer-deps: tolerates @rnmapbox/maps RN peer mismatch
+        # --ignore-scripts: skips native postinstalls (we only build web here)
+        run: npm install --legacy-peer-deps --ignore-scripts
+
+      - name: Export web bundle
+        env:
+          EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN: ${{ secrets.MAPBOX_ACCESS_TOKEN }}
+        run: npx expo export -p web
+
+      - name: Verify dist/ produced
+        run: |
+          if [ ! -d "dist" ]; then
+            echo "::error::expo export did not produce dist/"
+            exit 1
+          fi
+          echo "dist/ contents:"
+          ls -la dist/
+
+      - name: Deploy dist/ to Hostinger
+        uses: wlixcc/SFTP-Deploy-Action@v1.2.4
+        with:
+          server: ${{ secrets.HOSTINGER_HOST }}
+          port: ${{ secrets.HOSTINGER_PORT || '22' }}
+          username: ${{ secrets.HOSTINGER_USER }}
+          password: ${{ secrets.HOSTINGER_PASS }}
+          local_path: './dist/*'
+          remote_path: ${{ secrets.HOSTINGER_PATH }}
+          sftp_only: true
+          delete_remote_files: true
